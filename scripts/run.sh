@@ -177,7 +177,7 @@ sum_anomaly  ${yymmddS} ${yymmddE} ${quantile}
 
 
 #launch R program to detect heat waves
-R CMD BATCH hw.R 
+#R CMD BATCH hw.R 
 
 
  

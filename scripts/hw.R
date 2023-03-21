@@ -9,9 +9,23 @@ source("hw_functions.R")
 MAX_NUMBER_POOL_DAYS<-1
 #Lentgh of a heatwave
 LENGTH_HW<-3
+#Should a heatwave length (number of days) include the pool days?
+COUNT_WITH_POOLS<-FALSE
 
-#args <- commandArgs(trailingOnly = TRUE)
-#print(args)
+
+#dates
+yymmddS<-"2003-06-07" #start
+yymmddE<-"2003-06-12" #end
+
+
+######################################################
+##### Extract the info from the filename and create a calendar from yymmddS to yymmddE
+######################################################
+
+as.Date(yymmddS,format="%Y-%m-%d")->yymmddS
+as.Date(yymmddE,format="%Y-%m-%d")->yymmddE
+seq.Date(yymmddS,yymmddE,by="day")->calendar
+length(calendar)->number_of_days
 
 ######################################################
 ##### Look for the "intersection" netCDF file. 
@@ -20,29 +34,14 @@ LENGTH_HW<-3
 ##### 0 Tmax | Tmin below threshold
 ######################################################
 
-list.files(pattern="^binary.+_intersection_quantile.+\\.nc")->intersection_ffile
+glue::glue("^binary_{yymmddS}_{yymmddE}_.+intersection_quantile.+\\.nc")->intersectionFileName
+list.files(pattern=intersectionFileName)->intersection_ffile
 
 if(!length(intersection_ffile)){
-  stop("No intersection file found!")
-}else if(length(intersection_ffile)>1){
-  stop("Too many intersection files found! \n Please delete the old files!")
+  stop(glue::glue("No intersection {intersectionFileName} file found!"))
 }else{
   rast(intersection_ffile)->hw_brick  
 }
-
-######################################################
-##### Extract the info from the filename and create a calendar from yymmddS to yymmddE
-######################################################
-
-str_extract(intersection_ffile,"[0-9_-]+")->date_string
-unlist(str_split(str_remove(date_string,"_"),"_"))->dates
-dates[1]->yymmddS
-dates[2]->yymmddE
-
-as.Date(yymmddS,format="%Y-%m-%d")->yymmddS
-as.Date(yymmddE,format="%Y-%m-%d")->yymmddE
-seq.Date(yymmddS,yymmddE,by="day")->calendar
-length(calendar)->number_of_days
 
 
 ######################################################
@@ -51,12 +50,11 @@ length(calendar)->number_of_days
 ##### Each time stamp of this file contains the sum of the Tmax and Tmin anomalies; namely: (Tmax-Qtmax+Tmin-Qtmin)
 ######################################################
 
-list.files(pattern="^anomaly.+_i2n_quantile.+\\.nc")->anomaly_ffile
+glue::glue("^anomaly_{yymmddS}_{yymmddE}_.+i2n_quantile.+\\.nc")->anomalyFileName
+list.files(pattern=anomalyFileName)->anomaly_ffile
 
 if(!length(anomaly_ffile)){
-  stop("No anomaly I2(m) file found!")
-}else if(length(anomaly_ffile)>1){
-  stop("Too many anomaly files found! \n Please delete the old files!")
+  stop(glue::glue("No anomaly {anomalyFileName} file found!"))
 }else{
   rast(anomaly_ffile)->anomaly_brick 
 }
@@ -64,11 +62,35 @@ if(!length(anomaly_ffile)){
 ######################################################
 ##### Calculate Heat Waves
 ######################################################
-purrr::partial(.f=hw,.hw=hw_brick,.anomaly=anomaly_brick,.length_hw=LENGTH_HW,.max_number_pool_days=MAX_NUMBER_POOL_DAYS)->hw2
-purrr::map2(1:number_of_days,calendar,.f=hw2)->listOut
+purrr::partial(.f=hw,.hw=hw_brick,
+               .anomaly=anomaly_brick,
+               .total_number_of_days=number_of_days,
+               .length_hw=LENGTH_HW,
+               .max_number_pool_days=MAX_NUMBER_POOL_DAYS,
+               .count_with_pools=COUNT_WITH_POOLS)->hw2
 
-rast(purrr::map(listOut,"hw"))->brickHW
-rast(purrr::map(listOut,"i2n"))->brickI2
+purrr::walk2(1:number_of_days,calendar,.f=hw2)
 
-writeCDF(brickHW,glue::glue("hw_{yymmddS}_{yymmddE}.nc"),overwrite=TRUE)
-writeCDF(brickI2,glue::glue("i2n_{yymmddS}_{yymmddE}.nc"),overwrite=TRUE)
+#look for hw files in scratch for the time period of interest
+rast(purrr::map(glue::glue("./scratch/hw_previous_{calendar}.tif"),.f=~(readRaster(.))))->brickHW
+rast(purrr::map(glue::glue("./scratch/i2n_previous_{calendar}.tif"),.f=~(readRaster(.))))->brickI2
+
+rast(purrr::map(glue::glue("./scratch/hw_previous_fullcount_{calendar}.tif"),.f=~(readRaster(.))))->brickHW_fullcount
+rast(purrr::map(glue::glue("./scratch/i2n_previous_fullcount_{calendar}.tif"),.f=~(readRaster(.))))->brickI2_fullcount
+
+#return fullcount values only where brickHW >= LENGTH_HW
+purrr::map(1:number_of_days,.f=function(.lyr){
+  
+  ifel(brickHW[[.lyr]]>=LENGTH_HW,brickHW_fullcount[[.lyr]],0)
+  
+})->gridHW
+
+purrr::map(1:number_of_days,.f=function(.lyr){
+  
+  ifel(brickHW[[.lyr]]>=LENGTH_HW,brickI2_fullcount[[.lyr]],0)
+  
+})->gridI2
+
+
+writeCDF(rast(gridHW),glue::glue("hw_{yymmddS}_{yymmddE}.nc"),overwrite=TRUE)
+writeCDF(rast(gridI2),glue::glue("i2n_{yymmddS}_{yymmddE}.nc"),overwrite=TRUE)
