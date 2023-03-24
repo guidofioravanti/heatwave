@@ -14,8 +14,8 @@ COUNT_WITH_POOLS<-FALSE
 
 
 #dates
-yymmddS<-"2003-06-07" #start
-yymmddE<-"2003-06-12" #end
+yymmddS<-"2003-07-01" #start
+yymmddE<-"2003-08-31" #end
 
 
 ######################################################
@@ -76,7 +76,7 @@ rast(purrr::map(glue::glue("./scratch/hw_previous_{calendar}.tif"),.f=~(readRast
 rast(purrr::map(glue::glue("./scratch/i2n_previous_{calendar}.tif"),.f=~(readRaster(.))))->brickI2
 
 rast(purrr::map(glue::glue("./scratch/hw_previous_fullcount_{calendar}.tif"),.f=~(readRaster(.))))->brickHW_fullcount
-rast(purrr::map(glue::glue("./scratch/i2n_previous_fullcount_{calendar}.tif"),.f=~(readRaster(.))))->brickI2_fullcount
+#rast(purrr::map(glue::glue("./scratch/i2n_previous_fullcount_{calendar}.tif"),.f=~(readRaster(.))))->brickI2_fullcount
 
 #return fullcount values only where brickHW >= LENGTH_HW
 purrr::map(1:number_of_days,.f=function(.lyr){
@@ -87,7 +87,7 @@ purrr::map(1:number_of_days,.f=function(.lyr){
 
 purrr::map(1:number_of_days,.f=function(.lyr){
   
-  ifel(brickHW[[.lyr]]>=LENGTH_HW,brickI2_fullcount[[.lyr]],0)
+  ifel(brickHW[[.lyr]]>=LENGTH_HW,brickI2[[.lyr]],0)
   
 })->gridI2
 

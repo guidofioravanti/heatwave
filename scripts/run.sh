@@ -133,7 +133,7 @@ function extract_data {
 
 
 extract_data ${yymmddS} ${yymmddE} "max" ${quantile}
-extract_data ${yymmddS} ${yymmddE} "min" ${quantile} deselect when data are available
+extract_data ${yymmddS} ${yymmddE} "min" ${quantile} 
 
 
 ####################
@@ -163,13 +163,13 @@ function sum_anomaly {
     #sum annomaly files Tmax and Tmin: 
     cdo add anomaly_${1}_${2}_cds_era5_2m_temperature_max_quantile${3}.nc \
             anomaly_${1}_${2}_cds_era5_2m_temperature_min_quantile${3}.nc \
-	    temp.nc
+	    anomaly_${1}_${2}_cds_era5_2m_temperature_i2n_quantile${3}.nc
     
-    cdo mul binary_${1}_${2}_cds_era5_2m_temperature_intersection_quantile${3}.nc \
-	    temp.nc \
-	    anomaly_${1}_${2}_cds_era5_2m_temperature_i2n_quantile${3}.nc     
+#    cdo mul binary_${1}_${2}_cds_era5_2m_temperature_intersection_quantile${3}.nc \
+#	    temp.nc \
+#	    anomaly_${1}_${2}_cds_era5_2m_temperature_i2n_quantile${3}.nc     
 
-    rm -rf temp.nc
+#    rm -rf temp.nc
 }
 
 

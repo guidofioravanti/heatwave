@@ -41,7 +41,6 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   
   .hw[[.layer]]->x
   .anomaly[[.layer]]->y
-  
   previous_date<-.day-1
 
   ######################################################
@@ -78,19 +77,13 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
 
   readRaster(glue::glue("./scratch/hw_poolcount_{previous_date}.tif"))->pool_days_count  
   
-  if(.layer==1 & .count_with_pools){
-    
-    hw_previous_fullcount[(pool_days_count>0)]<-hw_previous_fullcount+pool_days_count
-    
-  }
-    
   # Temporary local grids
   i2n_previous->temp_i2n_previous
   i2n_previous_fullcount->temp_i2n_previous_fullcount
   hw_previous->temp_hw_previous
   hw_previous_fullcount->temp_hw_previous_fullcount  
   pool_days_count->temp_pool_days_count
-
+  
   ######
   # First/Second case: previous case is 0, pool is 0, x is 0 or 1
   # When x=0, nothing to do
@@ -101,7 +94,7 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   temp_hw_previous[CASE1]<-x+hw_previous
   temp_i2n_previous[CASE1]<-y+i2n_previous
   temp_hw_previous_fullcount[CASE1]<-x+hw_previous_fullcount  
-  temp_i2n_previous_fullcount[CASE1]<-y+i2n_previous_fullcount  
+  #temp_i2n_previous_fullcount[CASE1]<-y+i2n_previous_fullcount  
 
   ######
   # Third case: previous case is !=0, pool is 0, x is 1
@@ -111,7 +104,7 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   temp_hw_previous[CASE2]<-x+hw_previous
   temp_i2n_previous[CASE2]<-y+i2n_previous  
   temp_hw_previous_fullcount[CASE2]<-x+hw_previous_fullcount  
-  temp_i2n_previous_fullcount[CASE2]<-y+i2n_previous_fullcount  
+  #temp_i2n_previous_fullcount[CASE2]<-y+i2n_previous_fullcount  
   
   
   ######
@@ -121,10 +114,10 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   
   temp_pool_days_count[CASE3]<-pool_days_count+1  
   
-  if(.count_with_pools && (.layer<(.total_number_of_days-.max_number_pool_days+1))){
-    temp_hw_previous_fullcount[CASE3]<-1+hw_previous_fullcount
-    temp_i2n_previous_fullcount[CASE3]<-y+i2n_previous_fullcount
-  }
+  #if(.count_with_pools && (.layer<(.total_number_of_days-.max_number_pool_days+1))){
+    #temp_hw_previous_fullcount[CASE3]<-1+hw_previous_fullcount
+  temp_i2n_previous_fullcount[CASE3]<-y+i2n_previous_fullcount
+  #}
   
 
   
@@ -133,7 +126,7 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   ######  
   #ifel((x==0) & (hw_previous!=0) & (pool_days_count==MAX_NUMBER_POOL_DAYS) ,0,x)->x  
   CASE4<-((x==0) & (hw_previous!=0) & (pool_days_count==.max_number_pool_days))
-
+  
   temp_hw_previous[CASE4]<-0
   temp_i2n_previous[CASE4]<-0
   temp_hw_previous_fullcount[CASE4]<-0    
@@ -150,12 +143,13 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   ######
   # Sixth case: previous case is !=0, pool is < MAX_NUMBER_POOL_DAYS, x is 0
   ######
+
   CASE5<-((x==0) & (pool_days_count > 0) & (pool_days_count<.max_number_pool_days))
   temp_pool_days_count[CASE5]<-pool_days_count+1
-  if(.count_with_pools && (.layer<(.total_number_of_days-.max_number_pool_days+1))){
-    temp_hw_previous_fullcount[CASE5]<-1+hw_previous_fullcount 
-    temp_i2n_previous_fullcount[CASE5]<-y+i2n_previous_fullcount
-  }
+  #if(.count_with_pools && (.layer<(.total_number_of_days-.max_number_pool_days+1))){
+    #temp_hw_previous_fullcount[CASE5]<-1+hw_previous_fullcount 
+  temp_i2n_previous_fullcount[CASE5]<-y+i2n_previous_fullcount
+  #}
   
   ######
   # 7th case: 
@@ -164,8 +158,17 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   temp_pool_days_count[CASE6]<-0
   temp_hw_previous[CASE6]<-x+hw_previous
   temp_i2n_previous[CASE6]<-y+i2n_previous
-  temp_hw_previous_fullcount[CASE6]<-x+hw_previous_fullcount    
-  temp_i2n_previous_fullcount[CASE6]<-y+i2n_previous_fullcount    
+  
+  if(.count_with_pools){
+    temp_hw_previous_fullcount[CASE6]<-x+hw_previous_fullcount+pool_days_count    
+    temp_i2n_previous[CASE6]<-temp_i2n_previous+temp_i2n_previous_fullcount
+    temp_i2n_previous_fullcount[CASE6]<-0
+  }else{
+    temp_hw_previous_fullcount[CASE6]<-x+hw_previous_fullcount 
+    temp_i2n_previous_fullcount[CASE6]<-0
+    #temp_i2n_previous_fullcount[CASE6]<-0 here not necessary
+  }
+   
 
   writeRaster(temp_hw_previous,glue::glue("./scratch/hw_previous_{.day}.tif"),overwrite=TRUE,datatype="U32")
   writeRaster(temp_hw_previous_fullcount,glue::glue("./scratch/hw_previous_fullcount_{.day}.tif"),overwrite=TRUE,datatype="U32")
@@ -173,7 +176,5 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   writeRaster(temp_i2n_previous,glue::glue("./scratch/i2n_previous_{.day}.tif"),overwrite=TRUE)
   writeRaster(temp_i2n_previous_fullcount,glue::glue("./scratch/i2n_previous_fullcount_{.day}.tif"),overwrite=TRUE)
   
-  # list(hw=ifel(temp_hw_previous>=.length_hw,temp_hw_previous_fullcount,0),
-  #      i2n=ifel(temp_hw_previous>=.length_hw,temp_i2n_previous_fullcount,0))
-  
+
 }
