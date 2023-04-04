@@ -1,4 +1,4 @@
-readRaster<-function(.fileName){
+readRaster<-function(.fileName,.round=FALSE){
   
   str_replace(.fileName,"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}\\.tif","template.tif")->templateName
 
@@ -10,13 +10,18 @@ readRaster<-function(.fileName){
     
     rast(templateName)
     
-  })
-  
-  
+  })->out
+
+  if(.round){
+    round(out,0) 
+  }else{
+    out
+  }
+    
 }#end _readRaster
 
 
-invalidate_previous_data<-function(.fileName,.day,.max_number_pool_days,.mask=CASE4){
+invalidate_previous_data<-function(.fileName,.day,.max_number_pool_days,.mask,...){
   
   if(.max_number_pool_days==0){return()}
 
@@ -24,7 +29,7 @@ invalidate_previous_data<-function(.fileName,.day,.max_number_pool_days,.mask=CA
 
     readRaster(glue::glue("{.fileName}{.x}.tif"))->mygrid
     mygrid[.mask]<-0
-    writeRaster(mygrid,glue::glue("{.fileName}{.x}.tif"),overwrite=TRUE)
+    writeRaster(mygrid,glue::glue("{.fileName}{.x}.tif"),overwrite=TRUE,...)
     
   })  
   
@@ -52,9 +57,9 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   #####
   ######################################################
   
-  readRaster(glue::glue("./scratch/hw_previous_{previous_date}.tif"))->hw_previous
-  readRaster(glue::glue("./scratch/hw_previous_fullcount_{previous_date}.tif"))->hw_previous_fullcount
-  
+  readRaster(glue::glue("./scratch/hw_previous_{previous_date}.tif"),.round=TRUE)->hw_previous
+  readRaster(glue::glue("./scratch/hw_previous_fullcount_{previous_date}.tif"),.round=TRUE)->hw_previous_fullcount
+
   ######################################################
   ##### Read the previous file where the intensity data are stored
   ##### 1) The program looks for an intensity file referred to the yymmdd-1
@@ -64,8 +69,8 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   #####
   ######################################################
   
-  readRaster(glue::glue("./scratch/i2n_previous_{previous_date}.tif"))->i2n_previous
-  readRaster(glue::glue("./scratch/i2n_previous_fullcount_{previous_date}.tif"))->i2n_previous_fullcount
+  readRaster(glue::glue("./scratch/i2n_previous_{previous_date}.tif"),.round=FALSE)->i2n_previous
+  readRaster(glue::glue("./scratch/i2n_previous_fullcount_{previous_date}.tif"),.round=FALSE)->i2n_previous_fullcount
   
   ######################################################
   ##### Read the pool file where the number of pool days is stored
@@ -75,7 +80,7 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   ##### with all 0s.
   ######################################################
 
-  readRaster(glue::glue("./scratch/hw_poolcount_{previous_date}.tif"))->pool_days_count  
+  readRaster(glue::glue("./scratch/hw_poolcount_{previous_date}.tif"),.round=TRUE)->pool_days_count  
   
   # Temporary local grids
   i2n_previous->temp_i2n_previous
@@ -92,7 +97,7 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   #ifel((hw_previous==0) & (pool_days_count==0) ,x+hw_previous,x)->x
   CASE1<-((hw_previous==0) & (pool_days_count==0) )
   temp_hw_previous[CASE1]<-x+hw_previous
-  temp_i2n_previous[CASE1]<-y+i2n_previous
+  temp_i2n_previous[CASE1 & (x==1)]<-y+i2n_previous
   temp_hw_previous_fullcount[CASE1]<-x+hw_previous_fullcount  
   #temp_i2n_previous_fullcount[CASE1]<-y+i2n_previous_fullcount  
 
@@ -124,18 +129,20 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   ######
   # Fifth case: previous case is !=0, pool is .max_number_pool_days, x is 0
   ######  
+  
   #ifel((x==0) & (hw_previous!=0) & (pool_days_count==MAX_NUMBER_POOL_DAYS) ,0,x)->x  
   CASE4<-((x==0) & (hw_previous!=0) & (pool_days_count==.max_number_pool_days))
-  
+
   temp_hw_previous[CASE4]<-0
   temp_i2n_previous[CASE4]<-0
   temp_hw_previous_fullcount[CASE4]<-0    
   temp_i2n_previous_fullcount[CASE4]<-0  
   temp_pool_days_count[CASE4]<-0
   
-  if(any(values(CASE4)[[1]]==1)){
-    invalidate_previous_data("./scratch/hw_previous_",.day,.max_number_pool_days,.mask=CASE4)
-    invalidate_previous_data("./scratch/hw_previous_fullcount_",.day,.max_number_pool_days,.mask=CASE4)
+  
+  if(any(as.vector(values(CASE4)))){
+    invalidate_previous_data("./scratch/hw_previous_",.day,.max_number_pool_days,.mask=CASE4,datatype="INT1U")
+    invalidate_previous_data("./scratch/hw_previous_fullcount_",.day,.max_number_pool_days,.mask=CASE4,datatype="INT1U")
     invalidate_previous_data("./scratch/i2n_previous_",.day,.max_number_pool_days,.mask=CASE4)    
     invalidate_previous_data("./scratch/i2n_previous_fullcount_",.day,.max_number_pool_days,.mask=CASE4)        
   }
@@ -170,9 +177,10 @@ hw<-function(.hw,.anomaly,.layer,.day,.total_number_of_days,.length_hw=3,.max_nu
   }
    
 
-  writeRaster(temp_hw_previous,glue::glue("./scratch/hw_previous_{.day}.tif"),overwrite=TRUE,datatype="U32")
-  writeRaster(temp_hw_previous_fullcount,glue::glue("./scratch/hw_previous_fullcount_{.day}.tif"),overwrite=TRUE,datatype="U32")
-  writeRaster(temp_pool_days_count,glue::glue("./scratch/hw_poolcount_{.day}.tif"),overwrite=TRUE,datatype="U32")
+
+  writeRaster(temp_hw_previous,glue::glue("./scratch/hw_previous_{.day}.tif"),overwrite=TRUE,datatype="INT1U")
+  writeRaster(temp_hw_previous_fullcount,glue::glue("./scratch/hw_previous_fullcount_{.day}.tif"),overwrite=TRUE,datatype="INT1U")
+  writeRaster(temp_pool_days_count,glue::glue("./scratch/hw_poolcount_{.day}.tif"),overwrite=TRUE,datatype="INT1U")
   writeRaster(temp_i2n_previous,glue::glue("./scratch/i2n_previous_{.day}.tif"),overwrite=TRUE)
   writeRaster(temp_i2n_previous_fullcount,glue::glue("./scratch/i2n_previous_fullcount_{.day}.tif"),overwrite=TRUE)
   

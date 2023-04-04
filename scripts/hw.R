@@ -10,12 +10,12 @@ MAX_NUMBER_POOL_DAYS<-1
 #Lentgh of a heatwave
 LENGTH_HW<-3
 #Should a heatwave length (number of days) include the pool days?
-COUNT_WITH_POOLS<-FALSE
+COUNT_WITH_POOLS<-TRUE
 
 
 #dates
-yymmddS<-"2003-07-01" #start
-yymmddE<-"2003-08-31" #end
+yymmddS<-"2003-05-01" #start
+yymmddE<-"2003-09-30" #end
 
 
 ######################################################
@@ -34,7 +34,7 @@ length(calendar)->number_of_days
 ##### 0 Tmax | Tmin below threshold
 ######################################################
 
-glue::glue("^binary_{yymmddS}_{yymmddE}_.+intersection_quantile.+\\.nc")->intersectionFileName
+glue::glue("^binary_{yymmddS}_{yymmddE}_.+intersection_quantile.+\\.nc$")->intersectionFileName
 list.files(pattern=intersectionFileName)->intersection_ffile
 
 if(!length(intersection_ffile)){
@@ -44,13 +44,14 @@ if(!length(intersection_ffile)){
 }
 
 
+
 ######################################################
 ##### Look for the "anomaly" netCDF file.
 ##### This file has been calculated using CDO and it is used to calculate the first intensity heat wave metric.
 ##### Each time stamp of this file contains the sum of the Tmax and Tmin anomalies; namely: (Tmax-Qtmax+Tmin-Qtmin)
 ######################################################
 
-glue::glue("^anomaly_{yymmddS}_{yymmddE}_.+i2n_quantile.+\\.nc")->anomalyFileName
+glue::glue("^anomaly_{yymmddS}_{yymmddE}_.+i2n_quantile.+\\.nc$")->anomalyFileName
 list.files(pattern=anomalyFileName)->anomaly_ffile
 
 if(!length(anomaly_ffile)){
@@ -58,6 +59,7 @@ if(!length(anomaly_ffile)){
 }else{
   rast(anomaly_ffile)->anomaly_brick 
 }
+
 
 ######################################################
 ##### Calculate Heat Waves
