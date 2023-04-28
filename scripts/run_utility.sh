@@ -81,40 +81,53 @@ function extract_quantile {
     dayS=$(echo ${1} | cut -d"-" -f3)
 
     #estract year for the last date
-    yearE=$(echo ${1} | cut -d"-" -f1)
+    yearE=$(echo ${2} | cut -d"-" -f1)
     #extract month for the last date
     monthE=$(echo ${2} | cut -d"-" -f2)
     #extract day for the last date
     dayE=$(echo ${2} | cut -d"-" -f3)
 
-    #Note: the idea is that the script is run for one year (not for periods covering two different years).
-    #This is not a problem, because for the computation of the heatwaves length/intensity, the script considers the previous date.
+    #Note: the idea is that the script is run for one year (namely, yearS==yearE)
+    #This does not affect the results
+    #because for the computation of the heatwaves length/intensity,
+    #the script considers the previous date.
 
 
+    if [ ${yearS} != ${yearE} ];then
+
+        echo "Please, the first and last dates must refer to the same year!"   
+	exit 1
+	
+    fi
+    
     
     #check the presence of 29th february (leap year)
     let reminder="${yearS} % 4"
 
-    
+    #the quantile file contains the 29th, this must be stripped off for non-leap years
     if [ ${reminder} -eq 0 ];then
 
-	leapCommand="-del29feb"
+	leapCommand=""
 	
     else
 
-	leapCommand=""
+	leapCommand="-del29feb" #delete 29feb from the input dataset
 
     fi 
 
     #the command below:
-    # -first apply the leapCommand: for a leap year the CDO command is "-del29feb", otherwise no action
+    # -first apply the leapCommand: for a leap year
+    #  the CDO command is "-del29feb", otherwise no action is taken
     # -second extract the area of interest
+    # -third, select the period of interest
+    # -forth, select the name of the variable of interest 
 
     cdo select,name=${var_name} -seldate,${q_year}-${monthS}-${dayS},${q_year}-${monthE}-${dayE} \
         -sellonlatbox,${xmin},${xmax},${ymin},${ymax} \
 	${leapCommand}\
 	./quantiles/cds_era5_2m_temperature_${3}_ydrunpctl${4}_fix29feb.nc \
-        quantile_${monthS}_${dayS}_${monthE}_${dayE}_${3}_quantile${4}.nc #subset of Arthur's quantile file
+        quantile_${monthS}_${dayS}_${monthE}_${dayE}_${3}_quantile${4}.nc
+    #subset of Arthur's quantile file
 
     
 } #end extract_quantile
@@ -123,9 +136,12 @@ function extract_quantile {
 ############################################################################################
 #
 # Subset the data:
+#
 # - extract the daily data from ${yymmddS} to ${yymmddE}
-# - for tmax and tmin, generate a binary file where: 1 (temperature above (hw)/below(cs) the threshold), 0 otherwise;
-# - for tmax and tmin, generate an anomaly file for the calculation of the I2(n) intensity metric
+# - for tmax and tmin, generate a binary file where: 1 (temperature above (hw)/below(cs)
+#   the threshold), 0 otherwise;
+# - for tmax and tmin, generate an anomaly file (temperature - threshold)
+#   for the calculation of the I2(n) intensity metric
 #
 ############################################################################################
 
@@ -139,11 +155,12 @@ function extract_data {
     dayE=$(echo ${2} | cut -d"-" -f3)
 
     #subset daily data and save them in a temporary file temp.nc
+    #Here, there is no problem with the 29feb.
     cdo select,name=${var_name} -seldate,${1},${2} \
         -sellonlatbox,${xmin},${xmax},${ymin},${ymax} \
 	${yearS}_cds_era5_2m_temperature_${3}.nc temp.nc
     
-    #create a binary file: 1 if temp >= quantile (temp <= quantile for cold waves), 0 otherwise
+    #create a binary file: 1 if temp >= quantile (temp <= quantile for cold spells), 0 otherwise
     cdo -b F32 ${GTLT} temp.nc \
                   quantile_${monthS}_${dayS}_${monthE}_${dayE}_${3}_quantile${4}.nc \
                   binary_${1}_${2}_cds_era5_2m_temperature_${3}_quantile${4}.nc
@@ -156,28 +173,26 @@ function extract_data {
     #where anomalies are negative assign 0 otherwise 1
     if [ ${event} = "hw" ];then
 	
-	cdo gtc,0 anomaly.nc mask.nc
+	cdo gec,0 anomaly.nc mask.nc
 
     elif [ ${event} = "cs" ];then
 
-	cdo ltc,0 anomaly.nc mask.nc	
+	cdo lec,0 anomaly.nc mask.nc	
 	
     else
 
-    echo "Why am I here?"
+    echo "Why am I here? This cannot happen!"
     exit 1
     
     fi	
-	
-
-    	
+	   	
 	
     cdo mul mask.nc anomaly.nc anomaly_${1}_${2}_cds_era5_2m_temperature_${3}_quantile${4}.nc
 
     #delete the temporary file, please!
     rm -rf temp.nc anomaly.nc mask.nc
 
-} #end etract_data
+} #end extract_data
 
 
 ####################
@@ -189,7 +204,8 @@ function extract_data {
 
 function intersect_data {
 
-    #multiply binay files Tmax and Tmin: 1 is for cells where bot Tmax and Tmin are above (or below) the threshold
+    #multiply binary files Tmax and Tmin: 1 is for cells where bot Tmax and Tmin are above
+    #(or below) the threshold, 0 otherwise
     cdo mul binary_${1}_${2}_cds_era5_2m_temperature_max_quantile${3}.nc \
 	    binary_${1}_${2}_cds_era5_2m_temperature_min_quantile${3}.nc \
             binary_${1}_${2}_cds_era5_2m_temperature_intersection_quantile${3}.nc 
