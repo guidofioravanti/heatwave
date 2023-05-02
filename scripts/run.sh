@@ -2,12 +2,18 @@
 #!/bin/bash
 ###########################
 
-# Usage: ./run.sh 2003-06-01 2003-06-30 hw (heat waves for the month of June 2003)
-# Usage: ./run.sh 2003-03-01 2003-03-09 cs (cold spell for the month of March 2003)
+# Usage: ./run.sh 2003-06-01 2003-06-30 hw (heat waves for the whole month of June 2003)
+# Usage: ./run.sh 2003-03-01 2003-03-09 cs (cold spell for the month of March 2003, from the 1st to the 9th of March)
 
-source run_variables.sh
-source run_utility.sh
+##########################
+#this bash script uses two other sources:
+#########################
+source run_variables.sh #some input variables
+source run_utility.sh #utility functions
 
+#########################
+#remove previous temporary output files from the working directory
+#########################
 rm -rf quantile*.nc
 rm -rf binary*.nc
 rm -rf anomaly*.nc
@@ -16,9 +22,13 @@ rm -rf anomaly*.nc
 #
 # CDO and R script for heatwaves
 #
-# yymmddS: the first positional argument of the script, the initial date for the heatwave computation
-# yymmddE: the second positional argument of the script, the final date for the heatwave computation
-# event: the third position argument ("hw" for heat waves, "cs" for cold waves)
+# The three positional arguments passed to ./run.sh are save into three variables: yymmddS, yymmddE and event.
+#
+# yymmdd is for year month day, S is for start, E is for end: yymmddS and yymmddE
+#
+# yymmddS: the first positional argument of the script, the initial date for the heatwave/coldspell computation
+# yymmddE: the second positional argument of the script, the final date for the heatwave/coldspell computation
+# event: the third position argument ("hw" for heat waves, "cs" for cold spells)
 #
 ##################################################################################################
 
@@ -26,8 +36,13 @@ yymmddS=${1}
 yymmddE=${2}
 event=${3}
 
+##################################################################################################
+#
+# TSrat checking if three arguments have been passed to the script or not. If not, stop.
+#
+#################################################################################################
+
 # ${#event} is the length of the "event" string.
-#"event" contains the third argument passed to ./run.sh 
 
 if [ ${#event} -eq 0 ] || [ ${#yymmddS} -eq 0 ] || [ ${#yymmddE} -eq 0 ];then
 
@@ -41,12 +56,23 @@ fi
 
 ######################################################################
 #
-#Check if the third argument is "hw" (for heatwaves) or "cs" (for cold spells).
-#If not, the script stops
+# Check the input dates: the first and the second positional arguments passed to the script
+# are valid dates? are formatted well?
 #
 ######################################################################
 
-#quantile_vect is the vector with the quantile values (90 for heatwaves, 10 for cold spells)
+check_date ${yymmddS}
+check_date ${yymmddE}
+
+######################################################################
+#
+# Check if the third argument is "hw" (for heatwaves) or "cs" (for cold spells).
+# If not, the script stops
+#
+######################################################################
+
+#quantile_vect is the vector with the quantile values (90 for heatwaves, 10 for cold spells). quantile_vect
+#is defined in run_variables.sh
 
 if [ ${event} = "hw" ];then
     
@@ -78,20 +104,11 @@ fi
 
 welcome_message ${event_name} ${yymmddS} ${yymmddE} ${quantile}
 
-######################################################################
-#
-# Check the input dates: the first and the second positional arguments passed to the script
-# are valid dates? are formatted well?
-#
-######################################################################
-
-check_date ${yymmddS}
-check_date ${yymmddE}
-
 
 ######################################################################
 #
-# Extract the quantiles
+# Extract the quantiles for the period: yymmddS - yymmddE
+# The quantile depends on the event (90 for heatwaves, 10 for cold spells)
 #
 ######################################################################
 

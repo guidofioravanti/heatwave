@@ -11,7 +11,7 @@ body<-dashboardBody(
             absolutePanel(
               top="75px",
               left="25px",
-              shinyWidgets::sliderTextInput(inputId = "year",label="Year",choices = c(2018,2019,2022),grid = TRUE,force_edges = TRUE),
+              shinyWidgets::sliderTextInput(inputId = "year",label="Year",choices = c(2006,2018,2019,2022),grid = TRUE,force_edges = TRUE),
               shinyWidgets::sliderTextInput(inputId = "month",label = "Month",choices = month.name[1:5],grid=TRUE,force_edges = TRUE),
               sliderInput(inputId = "day",label = "Day",min = 1,max = 151,value = 1,step = 1,animate = TRUE),
               shinyWidgets::radioGroupButtons(inputId = "variable",label="Select Map Layer",choices=c("Heatwave Length","Heatwave Intensity"),justified = F,size = "sm",status="danger"),

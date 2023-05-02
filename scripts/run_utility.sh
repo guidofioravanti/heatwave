@@ -66,31 +66,33 @@ function check_date {
 # yymmddS is the first date (the first argument passed to the ./run.sh script)
 # yymmddE is the last date (the second argument passed to the ./run.sh script)
 #
-# Note: we need to take into account leap years!
+# Note: we need to take into account leap years! For non-leap years, we need to strip off the 29th February quantile from the quantile netCDF files
 #
 ####################
 ####################
 
 function extract_quantile {
 
-    #estract year for the first date
+    #extract "year" for the first date
     yearS=$(echo ${1} | cut -d"-" -f1)
-    #month for the first date
+    #"month" for the first date
     monthS=$(echo ${1} | cut -d"-" -f2)
-    #day for the first date
+    #"day" for the first date
     dayS=$(echo ${1} | cut -d"-" -f3)
 
-    #estract year for the last date
+    #extract "year" for the last date
     yearE=$(echo ${2} | cut -d"-" -f1)
-    #extract month for the last date
+    #extract "month" for the last date
     monthE=$(echo ${2} | cut -d"-" -f2)
-    #extract day for the last date
+    #extract "day" for the last date
     dayE=$(echo ${2} | cut -d"-" -f3)
 
     #Note: the idea is that the script is run for one year (namely, yearS==yearE)
     #This does not affect the results
     #because for the computation of the heatwaves length/intensity,
-    #the script considers the previous date.
+    #the script considers the previous date results. So for the elaboration of cold spells over two years:
+    # -run the script till the 12/31 of the first year
+    # -run the script from the 01/01 of the second year
 
 
     if [ ${yearS} != ${yearE} ];then
@@ -111,7 +113,7 @@ function extract_quantile {
 	
     else
 
-	leapCommand="-del29feb" #delete 29feb from the input dataset
+	leapCommand="-del29feb" #delete 29feb from the quantile files
 
     fi 
 
@@ -120,7 +122,12 @@ function extract_quantile {
     #  the CDO command is "-del29feb", otherwise no action is taken
     # -second extract the area of interest
     # -third, select the period of interest
-    # -forth, select the name of the variable of interest 
+    # -forth, select the name of the variable of interest
+
+
+    #The timestamp in the quantile files is 2020. This year is stored in the variable "q_year"
+    #The variable name in the quantile files and in the input files is t2m. This name is stored
+    #in the variable "var_name".
 
     cdo select,name=${var_name} -seldate,${q_year}-${monthS}-${dayS},${q_year}-${monthE}-${dayE} \
         -sellonlatbox,${xmin},${xmax},${ymin},${ymax} \
@@ -147,36 +154,47 @@ function extract_quantile {
 
 function extract_data {
 
+    #extract the year, month and day from the first date yymmddS
     yearS=$(echo ${1} | cut -d"-" -f1)
     monthS=$(echo ${1} | cut -d"-" -f2)
     dayS=$(echo ${1} | cut -d"-" -f3)
 
+    #extract the year, month and day from the second date yymmddE (we have already checked that yearS==yearE)
     monthE=$(echo ${2} | cut -d"-" -f2)
     dayE=$(echo ${2} | cut -d"-" -f3)
 
     #subset daily data and save them in a temporary file temp.nc
-    #Here, there is no problem with the 29feb.
+    #Here, there is no problem with the 29feb. The quantile files always contain the 29th of february.
+    #The input data contain the 29th of February only for leap years.
     cdo select,name=${var_name} -seldate,${1},${2} \
         -sellonlatbox,${xmin},${xmax},${ymin},${ymax} \
 	${yearS}_cds_era5_2m_temperature_${3}.nc temp.nc
     
     #create a binary file: 1 if temp >= quantile (temp <= quantile for cold spells), 0 otherwise
+    #GTLT is a cdo operator defined at the beginning of the script. If we are elaborating heatwaves,
+    #GTLT is ge (greater or equal than). For cold spells, the operator is le (less or equal than).
     cdo -b F32 ${GTLT} temp.nc \
                   quantile_${monthS}_${dayS}_${monthE}_${dayE}_${3}_quantile${4}.nc \
                   binary_${1}_${2}_cds_era5_2m_temperature_${3}_quantile${4}.nc
+
+    #The binary output files contain 1 where the condition is TRUE, 0 otherwise. We use the sequences of 1s to
+    #have the length of a heatwave/coldspell.
     
-    #calculate anomaly (for intensity I2(n) metric)
+    #calculate anomaly (for intensity: I2(n) metric in the paper of Christof)
     cdo -b F32 sub temp.nc \
 		   quantile_${monthS}_${dayS}_${monthE}_${dayE}_${3}_quantile${4}.nc \
 		   anomaly.nc
 
-    #where anomalies are negative assign 0 otherwise 1
+    #anomaly.nc contains the difference between the daily temperature and its quantile.
+
     if [ ${event} = "hw" ];then
-	
+
+	#where anomalies are negative assign 0 otherwise 1
 	cdo gec,0 anomaly.nc mask.nc
 
     elif [ ${event} = "cs" ];then
 
+	#where anomalies are positive assign 0 otherwise 1
 	cdo lec,0 anomaly.nc mask.nc	
 	
     else
@@ -186,7 +204,7 @@ function extract_data {
     
     fi	
 	   	
-	
+    #for the intensity, we need to store only those values where mask.nc is 1.	
     cdo mul mask.nc anomaly.nc anomaly_${1}_${2}_cds_era5_2m_temperature_${3}_quantile${4}.nc
 
     #delete the temporary file, please!
@@ -222,7 +240,7 @@ function intersect_data {
 
 function sum_anomaly {
 
-    #sum annomaly files Tmax and Tmin: 
+    #sum anomaly and divide by 2: 
     cdo divc,2 -add anomaly_${1}_${2}_cds_era5_2m_temperature_max_quantile${3}.nc \
             anomaly_${1}_${2}_cds_era5_2m_temperature_min_quantile${3}.nc \
 	    anomaly_${1}_${2}_cds_era5_2m_temperature_i2n_quantile${3}.nc
